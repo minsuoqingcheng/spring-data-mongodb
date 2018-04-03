@@ -28,7 +28,7 @@
 		<project.type>multi</project.type>
 		<dist.id>spring-data-mongodb</dist.id>
 		<springdata.commons>2.1.0.BUILD-SNAPSHOT</springdata.commons>
-		<mongo>3.6.3</mongo>
+		<mongo>3.7.0-SNAPSHOT</mongo>
 		<mongo.reactivestreams>1.7.1</mongo.reactivestreams>
 		<jmh.version>1.19</jmh.version>
 	</properties>
@@ -178,6 +178,8 @@
 			<groupId>org.mongodb</groupId>
 			<artifactId>mongo-java-driver</artifactId>
 			<version>${mongo}</version>
+			<scope>system</scope>
+			<systemPath>/Users/cstrobl/git/mongodb/mongo-java-driver/mongo-java-driver/build/libs/mongo-java-driver-3.8.0-SNAPSHOT.jar</systemPath>
 		</dependency>
 	</dependencies>
 
