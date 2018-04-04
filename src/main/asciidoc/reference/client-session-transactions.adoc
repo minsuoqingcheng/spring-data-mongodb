@@ -77,3 +77,121 @@ template.withSession(session)
 By using a `Publisher` providing the actual session you can defer session acquisition to the point of actual subscription.
 Still you need to close the session when done in order to not pollute the server with stale sessions. Use the `doFinally` hook on `execute` to call `ClientSession#close()` when you don't need the session any more.
 In case you prefer having more control over the session itself, you can always obtain the `ClientSession` via the driver and provide it via a `Supplier`.
+
+
+[[mongo.transactions]]
+= MongoDB Transactions
+
+As of version 4 MongoDB supports https://www.mongodb.com/transactions[Transactions]. Transactions are built on top of <<mongo.sessions,Sessions>> and therefore require an active `ClientSession`.
+
+NOTE: By default, unless you specify a `MongoTransactionManager` within your application context, transaction support is **DISABLED**. You're required to set `setTransactionSychronizationEnabled` accordingly.
+
+To get full programmatic control over transactions you may want to use the session callback on `MongoOperations`.
+
+.Programmatic transactions
+====
+[source,java]
+----
+ClientSession session = client.startSession(options);                   <1>
+
+template.withSession(session)
+    .execute(action -> {
+
+        session.startTransaction();                                     <2>
+
+        try {
+
+            Step step = // ...;
+            action.insert(step);
+
+            process(step);
+
+            action.update(Step.class).apply(Update.set("state", // ...
+
+            session.commitTransaction();                                <3>
+
+        } catch (RuntimeException e) {
+            session.abortTransaction();                                 <4>
+        }
+    }, ClientSession::close)                                            <5>
+    .subscribe();
+----
+<1> Obtain a new `ClientSession`.
+<2> Start the transaction.
+<3> If everything works out as expected, go on and commit the changes.
+<4> Something broke, just roll back everything.
+<5> Do not forget to close the session when done.
+====
+
+The above example allows you to have full control over transactional behavior while using the session scoped `MongoOperations` instance within the callback to ensure the session is passed on to each and every server call.
+To avoid some of the overhead that comes with this approach usage of a `TransactionTemplate` can take away some of the noise of manual transaction flow.
+
+== Transactions with TransactionTemplate
+
+.Transactions with TransactionTemplate
+====
+[source,java]
+----
+template.setTransactionSychronizationEnabled(true);                             <1>
+
+// ...
+
+TransactionTemplate txTemplate = new TransactionTemplate(txManager);            <2>
+
+txTemplate.execute(new TransactionCallbackWithoutResult() {
+
+	@Override
+	protected void doInTransactionWithoutResult(TransactionStatus status) {     <3>
+
+		Step step = // ...;
+		template.insert(step);
+
+		process(step);
+
+		template.update(Step.class).apply(Update.set("state", // ...
+	};
+});
+----
+<1> Manually enable transaction synchronization.
+<2> Create the `TransactionTemplate` using the provided `PlatformTransactionManager`.
+<3> Within the callback the `ClientSession` and transaction are already registered.
+====
+
+== Transactions with MongoTransactionManager
+
+`MongoTransactionManager` is the gateway to the well known Spring transaction support. It allows applications to use http://docs.spring.io/spring/docs/{springVersion}/spring-framework-reference/html/transaction.html[managed transaction features of Spring].
+The `MongoTransactionManager` binds a `ClientSession` to the thread. `MongoTemplate` automatically detects those and operates on them accordingly. `MongoTemplate` can also participate in other, ongoing transactions.
+
+.Transactions with MongoTransactionManager
+====
+[source,java]
+----
+@Configuration
+static class Config extends AbstractMongoConfiguration {
+
+	@Bean
+	MongoTransactionManager transactionManager(MongoDbFactory dbFactory) {  <1>
+		return new MongoTransactionManager(dbFactory);
+	}
+
+	// ...
+}
+
+@Component
+public class StateService {
+
+    @Transactional
+	void someBusinessFunction(Step step) {                                  <2>
+
+		template.insert(step);
+
+		process(step);
+
+		template.update(Step.class).apply(Update.set("state", // ...
+	};
+});
+
+----
+<1> Register `MongoTransactionManager` in the application context.
+<2> Mark methods as transactional.
+====

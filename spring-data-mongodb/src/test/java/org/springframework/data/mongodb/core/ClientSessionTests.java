@@ -16,12 +16,18 @@
 package org.springframework.data.mongodb.core;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.data.mongodb.core.query.Criteria.*;
+import static org.springframework.data.mongodb.core.query.Query.*;
+
+import lombok.AllArgsConstructor;
+import lombok.Data;
 
 import org.bson.Document;
 import org.junit.Before;
 import org.junit.ClassRule;
 import org.junit.Test;
 import org.junit.rules.TestRule;
+import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.test.util.MongoVersionRule;
 import org.springframework.data.mongodb.test.util.ReplicaSet;
@@ -29,7 +35,7 @@ import org.springframework.data.util.Version;
 
 import com.mongodb.ClientSessionOptions;
 import com.mongodb.MongoClient;
-import com.mongodb.session.ClientSession;
+import com.mongodb.client.ClientSession;
 
 /**
  * @author Christoph Strobl
@@ -47,7 +53,7 @@ public class ClientSessionTests {
 	public void setUp() {
 
 		client = new MongoClient();
-		template = new MongoTemplate(client, "reflective-client-session-tests");
+		template = new MongoTemplate(client, "client-session-tests");
 		template.getDb().getCollection("test").drop();
 
 		template.getDb().getCollection("test").insertOne(new Document("_id", "id-1").append("value", "spring"));
@@ -69,4 +75,64 @@ public class ClientSessionTests {
 
 		session.close();
 	}
+
+	@Test // DATAMONGO-1920
+	public void withCommittedTransaction() {
+
+		ClientSession session = client.startSession(ClientSessionOptions.builder().causallyConsistent(true).build());
+
+		assertThat(session.getOperationTime()).isNull();
+
+		session.startTransaction();
+
+		SomeDoc saved = template.withSession(() -> session).execute(action -> {
+
+			SomeDoc doc = new SomeDoc("id-2", "value2");
+			action.insert(doc);
+			return doc;
+		});
+
+		session.commitTransaction();
+		session.close();
+
+		assertThat(saved).isNotNull();
+		assertThat(session.getOperationTime()).isNotNull();
+
+		assertThat(template.exists(query(where("id").is(saved.getId())), SomeDoc.class)).isTrue();
+	}
+
+	@Test // DATAMONGO-1920
+	public void withAbortedTransaction() {
+
+		ClientSession session = client.startSession(ClientSessionOptions.builder().causallyConsistent(true).build());
+
+		assertThat(session.getOperationTime()).isNull();
+
+		session.startTransaction();
+
+		SomeDoc saved = template.withSession(() -> session).execute(action -> {
+
+			SomeDoc doc = new SomeDoc("id-2", "value2");
+			action.insert(doc);
+			return doc;
+		});
+
+		session.abortTransaction();
+		session.close();
+
+		assertThat(saved).isNotNull();
+		assertThat(session.getOperationTime()).isNotNull();
+
+		assertThat(template.exists(query(where("id").is(saved.getId())), SomeDoc.class)).isFalse();
+	}
+
+	@Data
+	@AllArgsConstructor
+	@org.springframework.data.mongodb.core.mapping.Document("test")
+	static class SomeDoc {
+
+		@Id String id;
+		String value;
+	}
+
 }
