@@ -39,7 +39,11 @@ import com.mongodb.client.ClientSession;
  * {@link ClientSession} based transactions for a single {@link MongoDbFactory}.
  * <p />
  * Binds a {@link ClientSession} from the specified {@link MongoDbFactory} to the thread.
- * 
+ * <p />
+ * {@link TransactionDefinition#isReadOnly() Readonly} transactions operate on a {@link ClientSession} and enable causal
+ * consistency, but do not actually {@link ClientSession#startTransaction() start},
+ * {@link ClientSession#commitTransaction() commit} or {@link ClientSession#abortTransaction() abort} a transaction.
+ *
  * @author Christoph Strobl
  * @currentRead Shadow's Edge - Brent Weeks
  * @since 2.1
@@ -64,9 +68,7 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	 * @see #setDbFactory(MongoDbFactory)
 	 * @see #setTransactionSynchronization(int)
 	 */
-	public MongoTransactionManager() {
-		// TODO: should we turn off transaction synchronisation by default?
-	}
+	public MongoTransactionManager() {}
 
 	/**
 	 * Create a new {@link MongoTransactionManager} obtaining sessions from the given {@link MongoDbFactory}.
@@ -126,20 +128,30 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 				ClientSessionOptions.builder().causallyConsistent(true).build());
 		mongoTransactionObject.setResourceHolder(resourceHolder);
 
-		if (logger.isDebugEnabled()) {
-			logger
-					.debug(String.format("About to start transaction for session %s.", debugString(resourceHolder.getSession())));
-		}
+		if (definition.isReadOnly()) {
 
-		try {
-			mongoTransactionObject.startTransaction(options);
-		} catch (MongoException ex) {
-			throw new TransactionSystemException(String.format("Could not start Mongo transaction for session %s.",
-					debugString(mongoTransactionObject.getSession())), ex);
-		}
+			if (logger.isDebugEnabled()) {
+				logger.debug(String.format(
+						"Detected readOnly transaction - enable causal consistency via session %s but do start read/write transaction.o",
+						debugString(resourceHolder.getSession())));
+			}
+		} else {
 
-		if (logger.isDebugEnabled()) {
-			logger.debug(String.format("Started transaction for session %s.", debugString(resourceHolder.getSession())));
+			if (logger.isDebugEnabled()) {
+				logger.debug(
+						String.format("About to start transaction for session %s.", debugString(resourceHolder.getSession())));
+			}
+
+			try {
+				mongoTransactionObject.startTransaction(options);
+			} catch (MongoException ex) {
+				throw new TransactionSystemException(String.format("Could not start Mongo transaction for session %s.",
+						debugString(mongoTransactionObject.getSession())), ex);
+			}
+
+			if (logger.isDebugEnabled()) {
+				logger.debug(String.format("Started transaction for session %s.", debugString(resourceHolder.getSession())));
+			}
 		}
 
 		resourceHolder.setSynchronizedWithTransaction(true);
@@ -175,6 +187,10 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	@Override
 	protected void doCommit(DefaultTransactionStatus status) throws TransactionException {
 
+		if (status.isReadOnly()) {
+			return; // readonly only uses the session - no need to commit that
+		}
+
 		MongoTransactionObject mongoTransactionObject = extractMongoTransaction(status);
 
 		if (logger.isDebugEnabled()) {
@@ -197,6 +213,10 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	 */
 	@Override
 	protected void doRollback(DefaultTransactionStatus status) throws TransactionException {
+
+		if (status.isReadOnly()) {
+			return; // readonly only uses the session - no need to rollback that
+		}
 
 		MongoTransactionObject mongoTransactionObject = extractMongoTransaction(status);
 
@@ -313,7 +333,9 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	 */
 	private MongoDbFactory getRequiredDbFactory() {
 
-		Assert.state(dbFactory != null, "Did you forget to provide a MongoDbFactory? It's required.");
+		Assert.state(dbFactory != null,
+				"MongoTransactionManager operates upon a MongoDbFactory. Did you forget to provide one? It's required.");
+
 		return dbFactory;
 	}
 

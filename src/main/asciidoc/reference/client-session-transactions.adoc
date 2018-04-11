@@ -84,7 +84,7 @@ In case you prefer having more control over the session itself, you can always o
 
 As of version 4 MongoDB supports https://www.mongodb.com/transactions[Transactions]. Transactions are built on top of <<mongo.sessions,Sessions>> and therefore require an active `ClientSession`.
 
-NOTE: By default, unless you specify a `MongoTransactionManager` within your application context, transaction support is **DISABLED**. You're required to set `setTransactionSychronizationEnabled` accordingly.
+NOTE: By default, unless you specify a `MongoTransactionManager` within your application context, transaction support is **DISABLED**. You may use `setSessionSynchronization(ANY)` to participate in ongoing non native MongoDB transactions.
 
 To get full programmatic control over transactions you may want to use the session callback on `MongoOperations`.
 
@@ -132,11 +132,11 @@ To avoid some of the overhead that comes with this approach usage of a `Transact
 ====
 [source,java]
 ----
-template.setTransactionSychronizationEnabled(true);                             <1>
+template.setSessionSynchronization(ANY);                                        <1>
 
 // ...
 
-TransactionTemplate txTemplate = new TransactionTemplate(txManager);            <2>
+TransactionTemplate txTemplate = new TransactionTemplate(anyTxManager);         <2>
 
 txTemplate.execute(new TransactionCallbackWithoutResult() {
 
@@ -180,7 +180,7 @@ static class Config extends AbstractMongoConfiguration {
 @Component
 public class StateService {
 
-    @Transactional
+	@Transactional
 	void someBusinessFunction(Step step) {                                  <2>
 
 		template.insert(step);
@@ -195,3 +195,5 @@ public class StateService {
 <1> Register `MongoTransactionManager` in the application context.
 <2> Mark methods as transactional.
 ====
+
+NOTE: `@Transactional(readOnly = true)` advises the  `MongoTransactionManager` to enable causal consistency by using a `ClientSession`. Though no transaction will be started, committed or aborted.

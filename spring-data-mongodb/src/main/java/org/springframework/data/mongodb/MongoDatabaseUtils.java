@@ -40,17 +40,17 @@ import com.mongodb.client.MongoDatabase;
 public class MongoDatabaseUtils {
 
 	/**
-	 * Obtain the {@link MongoDatabase database} with given name form the given {@link MongoDbFactory factory}.
+	 * Obtain the default {@link MongoDatabase database} form the given {@link MongoDbFactory factory} using
+	 * {@link SessionSynchronization#NATIVE native session synchronization}.
 	 * <p />
 	 * Registers a {@link MongoSessionSynchronization MongoDB specific transaction synchronization} within the current
 	 * {@link Thread} if {@link TransactionSynchronizationManager#isSynchronizationActive() snychronization is active}.
-	 * 
-	 * @param dbName the name of the {@link MongoDatabase} to get.
+	 *
 	 * @param factory the {@link MongoDbFactory} to get the {@link MongoDatabase} from.
 	 * @return must not be {@literal null}.
 	 */
-	public static MongoDatabase getDatabase(String dbName, MongoDbFactory factory) {
-		return doGetMongoDatabase(dbName, factory);
+	public static MongoDatabase getDatabase(MongoDbFactory factory) {
+		return doGetMongoDatabase(null, factory, SessionSynchronization.NATIVE);
 	}
 
 	/**
@@ -60,25 +60,65 @@ public class MongoDatabaseUtils {
 	 * {@link Thread} if {@link TransactionSynchronizationManager#isSynchronizationActive() snychronization is active}.
 	 *
 	 * @param factory the {@link MongoDbFactory} to get the {@link MongoDatabase} from.
+	 * @param sessionSynchronization the synchronization to use. Must not be {@literal null}.
 	 * @return must not be {@literal null}.
 	 */
-	public static MongoDatabase getDatabase(MongoDbFactory factory) {
-		return doGetMongoDatabase(null, factory);
+	public static MongoDatabase getDatabase(MongoDbFactory factory, SessionSynchronization sessionSynchronization) {
+		return doGetMongoDatabase(null, factory, sessionSynchronization);
 	}
 
-	private static MongoDatabase doGetMongoDatabase(@Nullable String dbName, MongoDbFactory factory) {
+	/**
+	 * Obtain the {@link MongoDatabase database} with given name form the given {@link MongoDbFactory factory} using
+	 * {@link SessionSynchronization#NATIVE native session synchronization}.
+	 * <p />
+	 * Registers a {@link MongoSessionSynchronization MongoDB specific transaction synchronization} within the current
+	 * {@link Thread} if {@link TransactionSynchronizationManager#isSynchronizationActive() snychronization is active}.
+	 *
+	 * @param dbName the name of the {@link MongoDatabase} to get.
+	 * @param factory the {@link MongoDbFactory} to get the {@link MongoDatabase} from.
+	 * @return must not be {@literal null}.
+	 */
+	public static MongoDatabase getDatabase(String dbName, MongoDbFactory factory) {
+		return doGetMongoDatabase(dbName, factory, SessionSynchronization.NATIVE);
+	}
+
+	/**
+	 * Obtain the {@link MongoDatabase database} with given name form the given {@link MongoDbFactory factory}.
+	 * <p />
+	 * Registers a {@link MongoSessionSynchronization MongoDB specific transaction synchronization} within the current
+	 * {@link Thread} if {@link TransactionSynchronizationManager#isSynchronizationActive() snychronization is active}.
+	 * 
+	 * @param dbName the name of the {@link MongoDatabase} to get.
+	 * @param factory the {@link MongoDbFactory} to get the {@link MongoDatabase} from.
+	 * @param sessionSynchronization the synchronization to use. Must not be {@literal null}.
+	 * @return must not be {@literal null}.
+	 */
+	public static MongoDatabase getDatabase(String dbName, MongoDbFactory factory,
+			SessionSynchronization sessionSynchronization) {
+		return doGetMongoDatabase(dbName, factory, sessionSynchronization);
+	}
+
+	private static MongoDatabase doGetMongoDatabase(@Nullable String dbName, MongoDbFactory factory,
+			SessionSynchronization sessionSynchronization) {
 
 		Assert.notNull(factory, "Factory must not be null!");
 
-		MongoDbFactory factoryToUse = TransactionSynchronizationManager.isSynchronizationActive()
-				? factory.withSession(doGetSession(factory)) : factory;
+		if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+			return StringUtils.hasText(dbName) ? factory.getDb(dbName) : factory.getDb();
+		}
+
+		ClientSession session = doGetSession(factory, sessionSynchronization);
+
+		MongoDbFactory factoryToUse = session != null ? factory.withSession(session) : factory;
 		return StringUtils.hasText(dbName) ? factoryToUse.getDb(dbName) : factoryToUse.getDb();
 	}
 
-	private static ClientSession doGetSession(MongoDbFactory dbFactory) {
+	@Nullable
+	private static ClientSession doGetSession(MongoDbFactory dbFactory, SessionSynchronization sessionSynchronization) {
 
 		MongoResourceHolder resourceHolder = (MongoResourceHolder) TransactionSynchronizationManager.getResource(dbFactory);
 
+		// check for native MongoDB transaction
 		if (resourceHolder != null && (resourceHolder.hasSession() || resourceHolder.isSynchronizedWithTransaction())) {
 
 			resourceHolder.requested();
@@ -87,6 +127,12 @@ public class MongoDatabaseUtils {
 			}
 			return resourceHolder.getSession();
 		}
+
+		if (SessionSynchronization.NATIVE.equals(sessionSynchronization)) {
+			return null;
+		}
+
+		// init a non native MongoDB transaction by registering a MongoSessionSynchronization
 
 		resourceHolder = new MongoResourceHolder(createClientSession(dbFactory), dbFactory);
 		resourceHolder.requested();

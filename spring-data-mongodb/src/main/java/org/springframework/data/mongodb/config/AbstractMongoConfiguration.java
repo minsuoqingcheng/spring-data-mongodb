@@ -15,14 +15,9 @@
  */
 package org.springframework.data.mongodb.config;
 
-import org.springframework.beans.BeansException;
-import org.springframework.beans.factory.NoSuchBeanDefinitionException;
-import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
-import org.springframework.beans.factory.config.ConfigurableListableBeanFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.MongoDbFactory;
-import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.SimpleMongoDbFactory;
 import org.springframework.data.mongodb.core.convert.DbRefResolver;
@@ -45,7 +40,7 @@ import com.mongodb.MongoClient;
  * @see MongoConfigurationSupport
  */
 @Configuration
-public abstract class AbstractMongoConfiguration extends MongoConfigurationSupport implements BeanFactoryPostProcessor {
+public abstract class AbstractMongoConfiguration extends MongoConfigurationSupport {
 
 	/**
 	 * Return the {@link MongoClient} instance to connect to. Annotate with {@link Bean} in case you want to expose a
@@ -114,21 +109,6 @@ public abstract class AbstractMongoConfiguration extends MongoConfigurationSuppo
 		converter.setCustomConversions(customConversions());
 
 		return converter;
-	}
-
-	@Override
-	public void postProcessBeanFactory(ConfigurableListableBeanFactory beanFactory) throws BeansException {
-
-		try {
-
-			// enable transaction support if native transaction manager found
-			beanFactory.getBean(MongoTransactionManager.class);
-
-			MongoTemplate template = beanFactory.getBean(MongoTemplate.class);
-			template.setTransactionSychronizationEnabled(true);
-		} catch (NoSuchBeanDefinitionException ex) {
-			// nothing to do
-		}
 	}
 
 }

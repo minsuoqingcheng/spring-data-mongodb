@@ -20,9 +20,7 @@ import static org.junit.Assert.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
-import javax.transaction.NotSupportedException;
 import javax.transaction.Status;
-import javax.transaction.SystemException;
 import javax.transaction.UserTransaction;
 
 import org.junit.After;
@@ -83,14 +81,14 @@ public class MongoDatabaseUtilsUnitTests {
 	@Test // DATAMONGO-1920
 	public void shouldNotStartSessionWhenNoTransactionOngoing() {
 
-		MongoDatabaseUtils.getDatabase(dbFactory);
+		MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.NATIVE);
 
 		verify(dbFactory, never()).getSession(any());
 		verify(dbFactory, never()).withSession(any(ClientSession.class));
 	}
 
 	@Test // DATAMONGO-1920
-	public void shouldParticipateInOngoingJtaTransactionWithCommit() throws SystemException, NotSupportedException {
+	public void shouldParticipateInOngoingJtaTransactionWithCommitWhenSessionSychronizationIsAny() throws Exception {
 
 		when(userTransaction.getStatus()).thenReturn(Status.STATUS_NO_TRANSACTION, Status.STATUS_ACTIVE,
 				Status.STATUS_ACTIVE);
@@ -107,7 +105,7 @@ public class MongoDatabaseUtilsUnitTests {
 				assertThat(transactionStatus.isNewTransaction()).isTrue();
 				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isFalse();
 
-				MongoDatabaseUtils.getDatabase(dbFactory);
+				MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.ANY);
 
 				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isTrue();
 			}
@@ -121,7 +119,7 @@ public class MongoDatabaseUtilsUnitTests {
 	}
 
 	@Test // DATAMONGO-1920
-	public void shouldParticipateInOngoingJtaTransactionWithRollback() throws SystemException, NotSupportedException {
+	public void shouldParticipateInOngoingJtaTransactionWithRollbackWhenSessionSychronizationIsAny() throws Exception {
 
 		when(userTransaction.getStatus()).thenReturn(Status.STATUS_NO_TRANSACTION, Status.STATUS_ACTIVE,
 				Status.STATUS_ACTIVE);
@@ -138,7 +136,7 @@ public class MongoDatabaseUtilsUnitTests {
 				assertThat(transactionStatus.isNewTransaction()).isTrue();
 				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isFalse();
 
-				MongoDatabaseUtils.getDatabase(dbFactory);
+				MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.ANY);
 
 				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isTrue();
 
@@ -153,4 +151,89 @@ public class MongoDatabaseUtilsUnitTests {
 		verify(session).close();
 	}
 
+	@Test // DATAMONGO-1920
+	public void shouldNotParticipateInOngoingJtaTransactionWithRollbackWhenSessionSychronizationIsNative()
+			throws Exception {
+
+		when(userTransaction.getStatus()).thenReturn(Status.STATUS_NO_TRANSACTION, Status.STATUS_ACTIVE,
+				Status.STATUS_ACTIVE);
+
+		JtaTransactionManager txManager = new JtaTransactionManager(userTransaction);
+		TransactionTemplate txTemplate = new TransactionTemplate(txManager);
+
+		txTemplate.execute(new TransactionCallbackWithoutResult() {
+
+			@Override
+			protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+
+				assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isTrue();
+				assertThat(transactionStatus.isNewTransaction()).isTrue();
+				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isFalse();
+
+				MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.NATIVE);
+
+				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isFalse();
+
+				transactionStatus.setRollbackOnly();
+			}
+		});
+
+		verify(userTransaction).rollback();
+
+		verify(session, never()).startTransaction();
+		verify(session, never()).abortTransaction();
+		verify(session, never()).close();
+	}
+
+	@Test // DATAMONGO-1920
+	public void shouldParticipateInOngoingMongoTransactionWhenSessionSychronizationIsNative() {
+
+		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
+		TransactionTemplate txTemplate = new TransactionTemplate(txManager);
+
+		txTemplate.execute(new TransactionCallbackWithoutResult() {
+
+			@Override
+			protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+
+				assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isTrue();
+				assertThat(transactionStatus.isNewTransaction()).isTrue();
+				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isTrue();
+
+				MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.NATIVE);
+
+				transactionStatus.setRollbackOnly();
+			}
+		});
+
+		verify(session).startTransaction();
+		verify(session).abortTransaction();
+		verify(session).close();
+	}
+
+	@Test // DATAMONGO-1920
+	public void shouldParticipateInOngoingMongoTransactionWhenSessionSychronizationIsAny() {
+
+		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
+		TransactionTemplate txTemplate = new TransactionTemplate(txManager);
+
+		txTemplate.execute(new TransactionCallbackWithoutResult() {
+
+			@Override
+			protected void doInTransactionWithoutResult(TransactionStatus transactionStatus) {
+
+				assertThat(TransactionSynchronizationManager.isSynchronizationActive()).isTrue();
+				assertThat(transactionStatus.isNewTransaction()).isTrue();
+				assertThat(TransactionSynchronizationManager.hasResource(dbFactory)).isTrue();
+
+				MongoDatabaseUtils.getDatabase(dbFactory, SessionSynchronization.ANY);
+
+				transactionStatus.setRollbackOnly();
+			}
+		});
+
+		verify(session).startTransaction();
+		verify(session).abortTransaction();
+		verify(session).close();
+	}
 }

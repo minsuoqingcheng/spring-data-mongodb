@@ -63,6 +63,7 @@ import org.springframework.data.mapping.context.MappingContext;
 import org.springframework.data.mapping.model.ConvertingPropertyAccessor;
 import org.springframework.data.mongodb.MongoDatabaseUtils;
 import org.springframework.data.mongodb.MongoDbFactory;
+import org.springframework.data.mongodb.SessionSynchronization;
 import org.springframework.data.mongodb.core.BulkOperations.BulkMode;
 import org.springframework.data.mongodb.core.DefaultBulkOperations.BulkOperationContext;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -91,6 +92,7 @@ import org.springframework.data.mongodb.core.mapping.MongoPersistentEntity;
 import org.springframework.data.mongodb.core.mapping.MongoPersistentProperty;
 import org.springframework.data.mongodb.core.mapping.MongoSimpleTypes;
 import org.springframework.data.mongodb.core.mapping.event.AfterConvertEvent;
+import org.springframework.data.mongodb.core.mapping.event.AfterDeleteEvent;
 import org.springframework.data.mongodb.core.mapping.event.AfterLoadEvent;
 import org.springframework.data.mongodb.core.mapping.event.AfterSaveEvent;
 import org.springframework.data.mongodb.core.mapping.event.BeforeConvertEvent;
@@ -205,7 +207,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 	private @Nullable ResourceLoader resourceLoader;
 	private @Nullable MongoPersistentEntityIndexCreator indexCreator;
 
-	private boolean transactionSychronizationEnabled = false;
+	private SessionSynchronization sessionSynchronization = SessionSynchronization.NATIVE;
 
 	/**
 	 * Constructor used for a basic template configuration
@@ -260,7 +262,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 
 		this.mongoDbFactory = dbFactory;
 		this.exceptionTranslator = that.exceptionTranslator;
-		this.transactionSychronizationEnabled = that.transactionSychronizationEnabled;
+		this.sessionSynchronization = that.sessionSynchronization;
 		this.mongoConverter = that.mongoConverter instanceof MappingMongoConverter ? getDefaultMongoConverter(dbFactory)
 				: that.mongoConverter;
 		this.queryMapper = that.queryMapper;
@@ -577,13 +579,14 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 	}
 
 	/**
-	 * By enabling transaction synchronization the template will participate in spring managed transactions.
-	 * <strong>NOTE:</strong> Requires at least MongoDB 4.0.
+	 * Define if {@link MongoTemplate} should participate in transactions. Default is set to
+	 * {@link SessionSynchronization#NATIVE}.<br />
+	 * <strong>NOTE:</strong> MongoDB transactions require at least MongoDB 4.0.
 	 *
 	 * @since 2.1
 	 */
-	public void setTransactionSychronizationEnabled(boolean enabled) {
-		this.transactionSychronizationEnabled = enabled;
+	public void setSessionSynchronization(SessionSynchronization sessionSynchronization) {
+		this.sessionSynchronization = sessionSynchronization;
 	}
 
 	/*
@@ -1779,7 +1782,12 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 				MongoCollection<Document> collectionToUse = writeConcernToUse != null
 						? collection.withWriteConcern(writeConcernToUse) : collection;
 
-				return multi ? collectionToUse.deleteMany(removeQuery, options) : collection.deleteOne(removeQuery, options);
+				DeleteResult result = multi ? collectionToUse.deleteMany(removeQuery, options)
+						: collection.deleteOne(removeQuery, options);
+
+				maybeEmitEvent(new AfterDeleteEvent<T>(queryObject, entityClass, collectionName));
+
+				return result;
 			}
 		});
 	}
@@ -2264,7 +2272,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 	}
 
 	protected MongoDatabase doGetDatabase() {
-		return transactionSychronizationEnabled ? MongoDatabaseUtils.getDatabase(mongoDbFactory) : mongoDbFactory.getDb();
+		return MongoDatabaseUtils.getDatabase(mongoDbFactory, sessionSynchronization);
 	}
 
 	protected MongoDatabase prepareDatabase(MongoDatabase database) {

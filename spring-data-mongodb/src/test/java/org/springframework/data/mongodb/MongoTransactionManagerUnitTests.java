@@ -83,7 +83,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -106,7 +105,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -142,7 +140,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -180,7 +177,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -203,7 +199,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -228,16 +223,16 @@ public class MongoTransactionManagerUnitTests {
 		txManager.commit(txStatus);
 
 		verify(session).startTransaction();
-		verify(session2).startTransaction();
+		verify(session2, never()).startTransaction();
 
 		verify(dbFactory, times(2)).withSession(eq(session));
-		verify(dbFactory).withSession(eq(session2));
+		verify(dbFactory, never()).withSession(eq(session2));
 
-		verify(db).drop();
+		verify(db, times(2)).drop();
 		verify(db).listCollections();
 
 		verify(session).close();
-		verify(session2).close();
+		verify(session2, never()).close();
 	}
 
 	@Test // DATAMONGO-1920
@@ -247,7 +242,6 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
-		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -283,5 +277,57 @@ public class MongoTransactionManagerUnitTests {
 
 		verify(session).close();
 		verify(session2).close();
+	}
+
+	@Test // DATAMONGO-1920
+	public void readonlyShouldJustInitiateASessionButNotStartAndCommitTransaction() {
+
+		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
+
+		DefaultTransactionDefinition readonlyTxDefinition = new DefaultTransactionDefinition();
+		readonlyTxDefinition.setReadOnly(true);
+
+		TransactionStatus txStatus = txManager.getTransaction(readonlyTxDefinition);
+
+		MongoTemplate template = new MongoTemplate(dbFactory);
+
+		template.execute(db -> {
+			db.drop();
+			return null;
+		});
+
+		verify(dbFactory).withSession(eq(session));
+
+		txManager.commit(txStatus);
+
+		verify(session, never()).startTransaction();
+		verify(session, never()).commitTransaction();
+		verify(session).close();
+	}
+
+	@Test // DATAMONGO-1920
+	public void readonlyShouldJustInitiateASessionButNotStartAndRollbackTransaction() {
+
+		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
+
+		DefaultTransactionDefinition readonlyTxDefinition = new DefaultTransactionDefinition();
+		readonlyTxDefinition.setReadOnly(true);
+
+		TransactionStatus txStatus = txManager.getTransaction(readonlyTxDefinition);
+
+		MongoTemplate template = new MongoTemplate(dbFactory);
+
+		template.execute(db -> {
+			db.drop();
+			return null;
+		});
+
+		verify(dbFactory).withSession(eq(session));
+
+		txManager.rollback(txStatus);
+
+		verify(session, never()).startTransaction();
+		verify(session, never()).abortTransaction();
+		verify(session).close();
 	}
 }
