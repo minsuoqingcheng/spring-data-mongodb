@@ -18,7 +18,6 @@ package org.springframework.data.mongodb.repository;
 import static org.assertj.core.api.Assertions.*;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 import org.bson.Document;
@@ -53,6 +52,7 @@ import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mongodb.MongoClient;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 
@@ -105,21 +105,30 @@ public class PersonRepositoryTransactionalTests {
 
 	@Before
 	public void setUp() throws InterruptedException {
-
 		assertionList = new ArrayList<>();
-
 	}
 
 	@BeforeTransaction
-	public void beforeTransaction() {
+	public void beforeTransaction() throws InterruptedException {
 
-		client.getDatabase(DB_NAME).getCollection(template.getCollectionName(Person.class)).deleteMany(new Document());
+		MongoCollection<Document> collection = client.getDatabase(DB_NAME)
+				.getCollection(template.getCollectionName(Person.class)).withWriteConcern(WriteConcern.ACKNOWLEDGED);
+		collection.deleteMany(new Document());
 
-		durzo = new Person("Durzo", "Blint", 700);
-		kylar = new Person("Kylar", "Stern", 21);
-		vi = new Person("Viridiana", "Sovari", 20);
-
-		all = repository.saveAll(Arrays.asList(durzo, kylar, vi));
+		// some testdata
+		// durzo = new Person("Durzo", "Blint", 700);
+		// kylar = new Person("Kylar", "Stern", 21);
+		// vi = new Person("Viridiana", "Sovari", 20);
+		//
+		// Document durzoDoc = new Document();
+		// Document kylarDoc = new Document();
+		// Document viDoc = new Document();
+		//
+		// template.getConverter().write(durzo, durzoDoc);
+		// template.getConverter().write(kylar, kylarDoc);
+		// template.getConverter().write(vi, viDoc);
+		//
+		// collection.insertMany(Arrays.asList(durzoDoc, kylarDoc, viDoc));
 	}
 
 	@AfterTransaction
