@@ -83,6 +83,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -105,6 +106,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -140,6 +142,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -177,6 +180,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -199,6 +203,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();
@@ -242,6 +247,7 @@ public class MongoTransactionManagerUnitTests {
 		TransactionStatus txStatus = txManager.getTransaction(new DefaultTransactionDefinition());
 
 		MongoTemplate template = new MongoTemplate(dbFactory);
+		template.setTransactionSychronizationEnabled(true);
 
 		template.execute(db -> {
 			db.drop();

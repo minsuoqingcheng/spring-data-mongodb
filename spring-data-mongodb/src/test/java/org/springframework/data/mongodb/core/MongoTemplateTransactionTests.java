@@ -18,6 +18,7 @@ package org.springframework.data.mongodb.core;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.Query.*;
+import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -96,8 +97,9 @@ public class MongoTemplateTransactionTests {
 	@Before
 	public void setUp() {
 
-		client.getDatabase(DB_NAME).getCollection(COLLECTION_NAME).deleteMany(new Document());
-		assertionList = new CopyOnWriteArrayList<AfterTransactionAssertion<Persistable<String>>>();
+		createOrReplaceCollection(DB_NAME, COLLECTION_NAME, client);
+
+		assertionList = new CopyOnWriteArrayList<>();
 	}
 
 	@AfterTransaction

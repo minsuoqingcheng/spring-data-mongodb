@@ -16,15 +16,16 @@
 package org.springframework.data.mongodb.repository;
 
 import static org.assertj.core.api.Assertions.*;
+import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -52,7 +53,6 @@ import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mongodb.MongoClient;
-import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 
@@ -60,7 +60,6 @@ import com.mongodb.client.model.Filters;
  * @author Christoph Strobl
  * @currentRead Shadow's Edge - Brent Weeks
  */
-// @Ignore("Segmentation fault: 11")
 @RunWith(SpringJUnit4ClassRunner.class)
 @ContextConfiguration
 @Transactional(transactionManager = "txManager")
@@ -105,30 +104,19 @@ public class PersonRepositoryTransactionalTests {
 
 	@Before
 	public void setUp() throws InterruptedException {
-		assertionList = new ArrayList<>();
+		assertionList = new CopyOnWriteArrayList<>();
 	}
 
 	@BeforeTransaction
 	public void beforeTransaction() throws InterruptedException {
 
-		MongoCollection<Document> collection = client.getDatabase(DB_NAME)
-				.getCollection(template.getCollectionName(Person.class)).withWriteConcern(WriteConcern.ACKNOWLEDGED);
-		collection.deleteMany(new Document());
+		createOrReplaceCollection(DB_NAME, template.getCollectionName(Person.class), client);
 
-		// some testdata
-		// durzo = new Person("Durzo", "Blint", 700);
-		// kylar = new Person("Kylar", "Stern", 21);
-		// vi = new Person("Viridiana", "Sovari", 20);
-		//
-		// Document durzoDoc = new Document();
-		// Document kylarDoc = new Document();
-		// Document viDoc = new Document();
-		//
-		// template.getConverter().write(durzo, durzoDoc);
-		// template.getConverter().write(kylar, kylarDoc);
-		// template.getConverter().write(vi, viDoc);
-		//
-		// collection.insertMany(Arrays.asList(durzoDoc, kylarDoc, viDoc));
+		durzo = new Person("Durzo", "Blint", 700);
+		kylar = new Person("Kylar", "Stern", 21);
+		vi = new Person("Viridiana", "Sovari", 20);
+
+		all = repository.saveAll(Arrays.asList(durzo, kylar, vi));
 	}
 
 	@AfterTransaction
@@ -150,7 +138,6 @@ public class PersonRepositoryTransactionalTests {
 
 	@Rollback(false)
 	@Test // DATAMONGO-1920
-	@Ignore("currently only deleteOne supports transactions - and this issues deleteMany")
 	public void shouldHonorCommitForDerivedQuery() {
 
 		repository.removePersonByLastnameUsingAnnotatedQuery(durzo.getLastname());
