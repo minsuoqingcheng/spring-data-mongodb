@@ -18,10 +18,12 @@ package org.springframework.data.mongodb.core;
 import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.SerializationUtils.*;
 
+import com.mongodb.client.model.ReplaceOptions;
 import lombok.NonNull;
 import lombok.RequiredArgsConstructor;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
+import reactor.core.publisher.SignalType;
 import reactor.util.function.Tuple2;
 
 import java.util.*;
@@ -135,6 +137,7 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
 import com.mongodb.reactivestreams.client.AggregatePublisher;
 import com.mongodb.reactivestreams.client.ChangeStreamPublisher;
+import com.mongodb.reactivestreams.client.ClientSession;
 import com.mongodb.reactivestreams.client.DistinctPublisher;
 import com.mongodb.reactivestreams.client.FindPublisher;
 import com.mongodb.reactivestreams.client.MapReducePublisher;
@@ -142,7 +145,6 @@ import com.mongodb.reactivestreams.client.MongoClient;
 import com.mongodb.reactivestreams.client.MongoCollection;
 import com.mongodb.reactivestreams.client.MongoDatabase;
 import com.mongodb.reactivestreams.client.Success;
-import com.mongodb.session.ClientSession;
 import com.mongodb.util.JSONParseException;
 
 /**
@@ -478,10 +480,53 @@ public class ReactiveMongoTemplate implements ReactiveMongoOperations, Applicati
 			public <T> Flux<T> execute(ReactiveSessionCallback<T> action, Consumer<ClientSession> doFinally) {
 
 				return cachedSession.flatMapMany(session -> {
+
 					return Flux
-							.from(action.doInSession(new ReactiveSessionBoundMongoTemplate(session, ReactiveMongoTemplate.this)))
-							.doFinally((signalType) -> doFinally.accept(session));
+
+							.from(action.doInSession(new ReactiveSessionBoundMongoTemplate(session, ReactiveMongoTemplate.this))) //
+							.subscriberContext(ctx -> ctx.put(ClientSession.class, cachedSession)) //
+							.materialize() //
+							.flatMap(signal -> {
+
+								if (session.hasActiveTransaction()) {
+									if (signal.isOnComplete()) {
+										return Mono.from(session.commitTransaction()).thenReturn(signal);
+									}
+									if (signal.isOnError()) {
+										return Mono.from(session.abortTransaction()).thenReturn(signal);
+									}
+								}
+								return Mono.just(signal);
+							}) //
+							.<T> dematerialize() //
+							.doFinally(signalType -> {
+								doFinally.accept(session);
+							});
 				});
+			}
+		};
+	}
+
+	public ReactiveSessionScoped inTransaction() {
+		return inTransaction(mongoDatabaseFactory.getSession(ClientSessionOptions.builder().causallyConsistent(true).build()));
+	}
+
+	/*
+	 * (non-Javadoc)
+	 * @see org.springframework.data.mongodb.core.ReactiveMongoOperations#withSession(org.reactivestreams.Publisher, java.util.function.Consumer)
+	 */
+	public ReactiveSessionScoped inTransaction(Publisher<ClientSession> sessionProvider) {
+
+		return new ReactiveSessionScoped() {
+
+			@Override
+			public <T> Flux<T> execute(ReactiveSessionCallback<T> action, Consumer<ClientSession> doFinally) {
+
+				return ReactiveMongoTemplate.this.withSession(Mono.from(sessionProvider).flatMap(session -> {
+
+					session.startTransaction();
+					return Mono.just(session);
+				})).execute(action, doFinally);
 			}
 		};
 	}
@@ -1580,7 +1625,12 @@ public class ReactiveMongoTemplate implements ReactiveMongoOperations, Applicati
 			query.getCollation().map(Collation::toMongoCollation).ifPresent(updateOptions::collation);
 
 			if (!UpdateMapper.isUpdateObject(updateObj)) {
-				return collectionToUse.replaceOne(queryObj, updateObj, updateOptions);
+
+				ReplaceOptions replaceOptions = new ReplaceOptions();
+				replaceOptions.upsert(updateOptions.isUpsert());
+				replaceOptions.collation(updateOptions.getCollation());
+
+				return collectionToUse.replaceOne(queryObj, updateObj, replaceOptions);
 			}
 			if (multi) {
 				return collectionToUse.updateMany(queryObj, updateObj, updateOptions);
@@ -2001,7 +2051,8 @@ public class ReactiveMongoTemplate implements ReactiveMongoOperations, Applicati
 			if (filterQuery.getLimit() > 0 || (options.getLimit() != null)) {
 
 				if (filterQuery.getLimit() > 0 && (options.getLimit() != null)) {
-					throw new IllegalArgumentException("Both Query and MapReduceOptions define a limit. Please provide the limit only via one of the two.");
+					throw new IllegalArgumentException(
+							"Both Query and MapReduceOptions define a limit. Please provide the limit only via one of the two.");
 				}
 
 				if (filterQuery.getLimit() > 0) {

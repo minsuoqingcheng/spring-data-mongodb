@@ -694,7 +694,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 			public Void doInCollection(MongoCollection<Document> collection) throws MongoException, DataAccessException {
 				collection.drop();
 				if (LOGGER.isDebugEnabled()) {
-					LOGGER.debug("Dropped collection [{}]", collection.getNamespace().getCollectionName());
+					LOGGER.debug("Dropped collection [{}]", collection.getNamespace() != null ? collection.getNamespace().getCollectionName() : collectionName);
 				}
 				return null;
 			}
@@ -2845,7 +2845,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 			if (LOGGER.isDebugEnabled()) {
 
 				LOGGER.debug("findOne using query: {} fields: {} in db.collection: {}", serializeToJsonSafely(query),
-						serializeToJsonSafely(fields.orElseGet(Document::new)), collection.getNamespace().getFullName());
+						serializeToJsonSafely(fields.orElseGet(Document::new)), collection.getNamespace() != null ?  collection.getNamespace().getFullName() : "n/a");
 			}
 
 			if (fields.isPresent()) {
