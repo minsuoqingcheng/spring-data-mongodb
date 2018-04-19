@@ -42,7 +42,7 @@ public class TxTests {
 	public void commitTx() {
 
 		try (MongoClient client = new MongoClient("localhost",
-				MongoClientOptions.builder().readPreference(ReadPreference.primary()).build())) {
+				MongoClientOptions.builder().requiredReplicaSetName("rs0").readPreference(ReadPreference.primary()).build())) {
 
 			MongoCollection<Document> collection = createOrReplaceCollection("client-session-tx-tests", "tx-tests", client);
 
@@ -51,7 +51,10 @@ public class TxTests {
 			Bson filter = Filters.eq("_id", "1");
 
 			session.startTransaction();
+
 			collection.insertOne(session, new Document("_id", "1"));
+
+			collection.find(session, new Document("_id", "1")).iterator().next();
 			session.commitTransaction();
 
 			session.close();

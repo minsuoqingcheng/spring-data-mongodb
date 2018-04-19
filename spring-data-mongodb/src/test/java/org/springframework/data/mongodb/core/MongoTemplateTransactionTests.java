@@ -78,7 +78,7 @@ public class MongoTemplateTransactionTests {
 
 		@Bean
 		public MongoClient mongoClient() {
-			return new MongoClient("localhost", MongoClientOptions.builder().readPreference(ReadPreference.primary()).build());
+			return new MongoClient("localhost", MongoClientOptions.builder().readPreference(ReadPreference.primary()).requiredReplicaSetName("rs0").build());
 		}
 
 		@Override
@@ -145,12 +145,13 @@ public class MongoTemplateTransactionTests {
 	}
 
 	@Test // DATAMONGO-1920
-	@Ignore("TODO: The find query withing the transaction cannot be parsed by the server - error code 9")
-	public void shouldBeAbleToViewChangesDuringTransactio() {
+//	@Ignore("TODO: The find query withing the transaction cannot be parsed by the server - error code 9")
+	public void shouldBeAbleToViewChangesDuringTransaction() throws InterruptedException {
 
 		Assassin durzo = new Assassin("durzo", "Durzo Blint");
 		template.save(durzo);
 
+		Thread.sleep(100);
 		Assassin retrieved = template.findOne(query(where("id").is(durzo.getId())), Assassin.class);
 
 		assertThat(retrieved).isEqualTo(durzo);

@@ -19,6 +19,7 @@ import org.bson.Document;
 
 import com.mongodb.MongoClient;
 import com.mongodb.ReadPreference;
+import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
@@ -37,15 +38,22 @@ public class MongoCollectionTestUtils {
 	public static MongoCollection<Document> createOrReplaceCollection(String dbName, String collectionName,
 			MongoClient client) {
 
-		MongoDatabase database = client.getDatabase(dbName);
-		boolean collectionExists = database.withReadPreference(ReadPreference.primary()).listCollections()
-				.filter(new Document("name", collectionName)).first() != null;
+		MongoDatabase database = client.getDatabase(dbName).withWriteConcern(WriteConcern.MAJORITY)
+				.withReadPreference(ReadPreference.primary());
+
+		boolean collectionExists = database.listCollections().filter(new Document("name", collectionName)).first() != null;
 
 		if (collectionExists) {
 			database.getCollection(collectionName).drop();
 		}
 
 		database.createCollection(collectionName);
+
+		try {
+			Thread.sleep(10); // server replication time
+		} catch (InterruptedException e) {
+			e.printStackTrace();
+		}
 
 		return database.getCollection(collectionName);
 	}

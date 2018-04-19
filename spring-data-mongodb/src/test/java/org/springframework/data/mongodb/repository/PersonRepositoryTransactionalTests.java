@@ -54,6 +54,8 @@ import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mongodb.MongoClient;
+import com.mongodb.MongoClientOptions;
+import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 
@@ -77,7 +79,8 @@ public class PersonRepositoryTransactionalTests {
 
 		@Bean
 		public MongoClient mongoClient() {
-			return new MongoClient();
+			return new MongoClient("localhost",
+					MongoClientOptions.builder().readPreference(ReadPreference.primary()).requiredReplicaSetName("rs0").build());
 		}
 
 		@Override
@@ -139,7 +142,6 @@ public class PersonRepositoryTransactionalTests {
 
 	@Rollback(false)
 	@Test // DATAMONGO-1920
-	@Ignore("Tx does not work with multi delete")
 	public void shouldHonorCommitForDerivedQuery() {
 
 		repository.removePersonByLastnameUsingAnnotatedQuery(durzo.getLastname());
