@@ -19,6 +19,16 @@ import static org.assertj.core.api.Assertions.*;
 import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.Query.*;
 
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.mongodb.MongoClientOptions;
+import com.mongodb.ReadPreference;
+import com.mongodb.client.FindIterable;
+import com.mongodb.client.MongoCollection;
+import com.mongodb.client.MongoDatabase;
+import com.mongodb.client.model.Filters;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -58,6 +68,8 @@ public class ClientSessionTests {
 
 		template.getDb().getCollection("test").insertOne(new Document("_id", "id-1").append("value", "spring"));
 	}
+
+
 
 	@Test // DATAMONGO-1880
 	public void shouldApplyClientSession() {

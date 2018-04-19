@@ -20,6 +20,8 @@ import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.Query.*;
 import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
 
+import com.mongodb.MongoClientOptions;
+import com.mongodb.ReadPreference;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -49,6 +51,7 @@ import org.springframework.test.annotation.Rollback;
 import org.springframework.test.context.ContextConfiguration;
 import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
 import org.springframework.test.context.transaction.AfterTransaction;
+import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mongodb.MongoClient;
@@ -75,7 +78,7 @@ public class MongoTemplateTransactionTests {
 
 		@Bean
 		public MongoClient mongoClient() {
-			return new MongoClient();
+			return new MongoClient("localhost", MongoClientOptions.builder().readPreference(ReadPreference.primary()).build());
 		}
 
 		@Override
@@ -97,15 +100,20 @@ public class MongoTemplateTransactionTests {
 	@Before
 	public void setUp() {
 
-		createOrReplaceCollection(DB_NAME, COLLECTION_NAME, client);
-
+		template.setReadPreference(ReadPreference.primary());
 		assertionList = new CopyOnWriteArrayList<>();
+	}
+
+	@BeforeTransaction
+	public void xxx() {
+
+		createOrReplaceCollection(DB_NAME, COLLECTION_NAME, client);
 	}
 
 	@AfterTransaction
 	public void verifyDbState() throws InterruptedException {
 
-		MongoCollection<Document> collection = client.getDatabase(DB_NAME).getCollection(COLLECTION_NAME);
+		MongoCollection<Document> collection = client.getDatabase(DB_NAME).withReadPreference(ReadPreference.primary()).getCollection(COLLECTION_NAME);
 
 		assertionList.forEach(it -> {
 

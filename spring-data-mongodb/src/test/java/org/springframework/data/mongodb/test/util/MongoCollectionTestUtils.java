@@ -18,6 +18,8 @@ package org.springframework.data.mongodb.test.util;
 import org.bson.Document;
 
 import com.mongodb.MongoClient;
+import com.mongodb.ReadPreference;
+import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
 /**
@@ -32,16 +34,20 @@ public class MongoCollectionTestUtils {
 	 * @param collectionName must not be {@literal null}.
 	 * @param client must not be {@literal null}.
 	 */
-	public static void createOrReplaceCollection(String dbName, String collectionName, MongoClient client) {
+	public static MongoCollection<Document> createOrReplaceCollection(String dbName, String collectionName,
+			MongoClient client) {
 
 		MongoDatabase database = client.getDatabase(dbName);
-		boolean collectionExists = database.listCollections().filter(new Document("name", collectionName)).first() != null;
+		boolean collectionExists = database.withReadPreference(ReadPreference.primary()).listCollections()
+				.filter(new Document("name", collectionName)).first() != null;
 
 		if (collectionExists) {
 			database.getCollection(collectionName).drop();
 		}
 
 		database.createCollection(collectionName);
+
+		return database.getCollection(collectionName);
 	}
 
 }
