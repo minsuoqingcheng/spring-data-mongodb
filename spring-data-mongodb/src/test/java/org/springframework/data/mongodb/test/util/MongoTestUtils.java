@@ -18,6 +18,7 @@ package org.springframework.data.mongodb.test.util;
 import org.bson.Document;
 
 import com.mongodb.MongoClient;
+import com.mongodb.MongoClientOptions;
 import com.mongodb.ReadPreference;
 import com.mongodb.WriteConcern;
 import com.mongodb.client.MongoCollection;
@@ -26,7 +27,7 @@ import com.mongodb.client.MongoDatabase;
 /**
  * @author Christoph Strobl
  */
-public class MongoCollectionTestUtils {
+public class MongoTestUtils {
 
 	/**
 	 * Create a {@link com.mongodb.client.MongoCollection} if it does not exist, or drop and recreate it if it does.
@@ -56,6 +57,17 @@ public class MongoCollectionTestUtils {
 		}
 
 		return database.getCollection(collectionName);
+	}
+
+	/**
+	 * Create a new {@link MongoClient} with defaults suitable for replica set usage.
+	 *
+	 * @return new instance of {@link MongoClient}.
+	 */
+	public static MongoClient replSetClient() {
+
+		return new MongoClient("localhost",
+				MongoClientOptions.builder().readPreference(ReadPreference.primary()).requiredReplicaSetName("rs0").build());
 	}
 
 }

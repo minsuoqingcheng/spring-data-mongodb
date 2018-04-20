@@ -16,7 +16,7 @@
 package org.springframework.data.mongodb.repository;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
+import static org.springframework.data.mongodb.test.util.MongoTestUtils.*;
 
 import java.util.Arrays;
 import java.util.List;
@@ -26,7 +26,6 @@ import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
@@ -42,6 +41,7 @@ import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
 import org.springframework.data.mongodb.test.util.AfterTransactionAssertion;
+import org.springframework.data.mongodb.test.util.MongoTestUtils;
 import org.springframework.data.mongodb.test.util.MongoVersionRule;
 import org.springframework.data.mongodb.test.util.ReplicaSet;
 import org.springframework.data.util.Version;
@@ -79,8 +79,7 @@ public class PersonRepositoryTransactionalTests {
 
 		@Bean
 		public MongoClient mongoClient() {
-			return new MongoClient("localhost",
-					MongoClientOptions.builder().readPreference(ReadPreference.primary()).requiredReplicaSetName("rs0").build());
+			return MongoTestUtils.replSetClient();
 		}
 
 		@Override

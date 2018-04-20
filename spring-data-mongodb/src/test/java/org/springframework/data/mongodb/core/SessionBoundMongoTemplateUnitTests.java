@@ -97,6 +97,8 @@ public class SessionBoundMongoTemplateUnitTests {
 
 		when(client.getDatabase(anyString())).thenReturn(database);
 		when(codecRegistry.get(any(Class.class))).thenReturn(new BsonValueCodec());
+		when(database.withReadPreference(any())).thenReturn(database);
+		when(database.withWriteConcern(any())).thenReturn(database);
 		when(database.getCodecRegistry()).thenReturn(codecRegistry);
 		when(database.getCollection(anyString(), any())).thenReturn(collection);
 		when(database.listCollectionNames(any(ClientSession.class))).thenReturn(mongoIterable);

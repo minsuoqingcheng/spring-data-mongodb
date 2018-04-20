@@ -18,10 +18,8 @@ package org.springframework.data.mongodb.core;
 import static org.assertj.core.api.Assertions.*;
 import static org.springframework.data.mongodb.core.query.Criteria.*;
 import static org.springframework.data.mongodb.core.query.Query.*;
-import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
+import static org.springframework.data.mongodb.test.util.MongoTestUtils.*;
 
-import com.mongodb.MongoClientOptions;
-import com.mongodb.ReadPreference;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -31,7 +29,6 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import org.bson.Document;
 import org.junit.Before;
 import org.junit.ClassRule;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.rules.RuleChain;
 import org.junit.runner.RunWith;
@@ -44,6 +41,7 @@ import org.springframework.data.mongodb.MongoDbFactory;
 import org.springframework.data.mongodb.MongoTransactionManager;
 import org.springframework.data.mongodb.config.AbstractMongoConfiguration;
 import org.springframework.data.mongodb.test.util.AfterTransactionAssertion;
+import org.springframework.data.mongodb.test.util.MongoTestUtils;
 import org.springframework.data.mongodb.test.util.MongoVersionRule;
 import org.springframework.data.mongodb.test.util.ReplicaSet;
 import org.springframework.data.util.Version;
@@ -55,6 +53,7 @@ import org.springframework.test.context.transaction.BeforeTransaction;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.mongodb.MongoClient;
+import com.mongodb.ReadPreference;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 
@@ -78,7 +77,7 @@ public class MongoTemplateTransactionTests {
 
 		@Bean
 		public MongoClient mongoClient() {
-			return new MongoClient("localhost", MongoClientOptions.builder().readPreference(ReadPreference.primary()).requiredReplicaSetName("rs0").build());
+			return MongoTestUtils.replSetClient();
 		}
 
 		@Override
@@ -113,7 +112,8 @@ public class MongoTemplateTransactionTests {
 	@AfterTransaction
 	public void verifyDbState() throws InterruptedException {
 
-		MongoCollection<Document> collection = client.getDatabase(DB_NAME).withReadPreference(ReadPreference.primary()).getCollection(COLLECTION_NAME);
+		MongoCollection<Document> collection = client.getDatabase(DB_NAME).withReadPreference(ReadPreference.primary())
+				.getCollection(COLLECTION_NAME);
 
 		assertionList.forEach(it -> {
 
@@ -145,7 +145,7 @@ public class MongoTemplateTransactionTests {
 	}
 
 	@Test // DATAMONGO-1920
-//	@Ignore("TODO: The find query withing the transaction cannot be parsed by the server - error code 9")
+	// @Ignore("TODO: The find query withing the transaction cannot be parsed by the server - error code 9")
 	public void shouldBeAbleToViewChangesDuringTransaction() throws InterruptedException {
 
 		Assassin durzo = new Assassin("durzo", "Durzo Blint");

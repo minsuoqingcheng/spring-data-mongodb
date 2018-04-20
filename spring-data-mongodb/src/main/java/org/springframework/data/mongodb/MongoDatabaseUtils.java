@@ -17,6 +17,7 @@ package org.springframework.data.mongodb;
 
 import com.mongodb.ReadPreference;
 import com.mongodb.TransactionOptions;
+import com.mongodb.WriteConcern;
 import org.springframework.lang.Nullable;
 import org.springframework.transaction.support.ResourceHolderSynchronization;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -111,10 +112,15 @@ public class MongoDatabaseUtils {
 
 		ClientSession session = doGetSession(factory, sessionSynchronization);
 
-		MongoDbFactory factoryToUse = session != null ? factory.withSession(session) : factory;
+		if(session == null) {
+			return StringUtils.hasText(dbName) ? factory.getDb(dbName) : factory.getDb();
+		}
+
+		MongoDbFactory factoryToUse = factory.withSession(session);
 		MongoDatabase db = StringUtils.hasText(dbName) ? factoryToUse.getDb(dbName) : factoryToUse.getDb();
 
-		return db.withReadPreference(ReadPreference.primary()); // ugly hack
+		// and now apply some hacks to make sure we end up on the right spot.
+		return db.withReadPreference(ReadPreference.primary()).withWriteConcern(WriteConcern.MAJORITY); // ugly hack
 	}
 
 	@Nullable

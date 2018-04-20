@@ -16,7 +16,7 @@
 package org.springframework.data.mongodb.core;
 
 import static org.assertj.core.api.Assertions.*;
-import static org.springframework.data.mongodb.test.util.MongoCollectionTestUtils.*;
+import static org.springframework.data.mongodb.test.util.MongoTestUtils.*;
 
 import java.util.ArrayList;
 

@@ -25,6 +25,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
+import org.springframework.data.mongodb.core.MongoExceptionTranslator;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -67,6 +68,12 @@ public class MongoTransactionManagerUnitTests {
 		when(session2.getServerSession()).thenReturn(serverSession);
 
 		when(serverSession.isClosed()).thenReturn(false);
+
+		when(db.withReadPreference(any())).thenReturn(db);
+		when(db.withWriteConcern(any())).thenReturn(db);
+
+		when(db2.withReadPreference(any())).thenReturn(db2);
+		when(db2.withWriteConcern(any())).thenReturn(db2);
 	}
 
 	@After

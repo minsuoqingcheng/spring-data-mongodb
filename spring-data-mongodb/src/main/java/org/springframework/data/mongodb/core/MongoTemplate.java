@@ -2334,7 +2334,7 @@ public class MongoTemplate implements MongoOperations, ApplicationContextAware, 
 
 				// TODO: Emit a collection created event
 				if (LOGGER.isDebugEnabled()) {
-					LOGGER.debug("Created collection [{}]", coll.getNamespace().getCollectionName());
+					LOGGER.debug("Created collection [{}]", coll.getNamespace() != null ? coll.getNamespace().getCollectionName() : collectionName);
 				}
 				return coll;
 			}
