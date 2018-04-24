@@ -25,7 +25,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnitRunner;
-import org.springframework.data.mongodb.core.MongoExceptionTranslator;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.TransactionStatus;
@@ -287,7 +286,7 @@ public class MongoTransactionManagerUnitTests {
 	}
 
 	@Test // DATAMONGO-1920
-	public void readonlyShouldJustInitiateASessionButNotStartAndCommitTransaction() {
+	public void readonlyShouldInitiateASessionStartAndCommitTransaction() {
 
 		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
 
@@ -307,13 +306,13 @@ public class MongoTransactionManagerUnitTests {
 
 		txManager.commit(txStatus);
 
-		verify(session, never()).startTransaction();
-		verify(session, never()).commitTransaction();
+		verify(session).startTransaction();
+		verify(session).commitTransaction();
 		verify(session).close();
 	}
 
 	@Test // DATAMONGO-1920
-	public void readonlyShouldJustInitiateASessionButNotStartAndRollbackTransaction() {
+	public void readonlyShouldInitiateASessionStartAndRollbackTransaction() {
 
 		MongoTransactionManager txManager = new MongoTransactionManager(dbFactory);
 
@@ -333,8 +332,8 @@ public class MongoTransactionManagerUnitTests {
 
 		txManager.rollback(txStatus);
 
-		verify(session, never()).startTransaction();
-		verify(session, never()).abortTransaction();
+		verify(session).startTransaction();
+		verify(session).abortTransaction();
 		verify(session).close();
 	}
 }

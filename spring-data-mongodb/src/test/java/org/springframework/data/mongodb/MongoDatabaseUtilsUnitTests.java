@@ -61,6 +61,9 @@ public class MongoDatabaseUtilsUnitTests {
 
 		when(dbFactory.getDb()).thenReturn(db);
 
+		when(db.withReadPreference(any())).thenReturn(db);
+		when(db.withWriteConcern(any())).thenReturn(db);
+
 		when(session.getServerSession()).thenReturn(serverSession);
 		when(session.hasActiveTransaction()).thenReturn(true);
 

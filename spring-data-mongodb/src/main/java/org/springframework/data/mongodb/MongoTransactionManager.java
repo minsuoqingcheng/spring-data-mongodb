@@ -41,8 +41,8 @@ import com.mongodb.client.ClientSession;
  * Binds a {@link ClientSession} from the specified {@link MongoDbFactory} to the thread.
  * <p />
  * {@link TransactionDefinition#isReadOnly() Readonly} transactions operate on a {@link ClientSession} and enable causal
- * consistency, but do not actually {@link ClientSession#startTransaction() start},
- * {@link ClientSession#commitTransaction() commit} or {@link ClientSession#abortTransaction() abort} a transaction.
+ * consistency, and also {@link ClientSession#startTransaction() start}, {@link ClientSession#commitTransaction()
+ * commit} or {@link ClientSession#abortTransaction() abort} a transaction.
  *
  * @author Christoph Strobl
  * @currentRead Shadow's Edge - Brent Weeks
@@ -128,30 +128,20 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 				ClientSessionOptions.builder().causallyConsistent(true).build());
 		mongoTransactionObject.setResourceHolder(resourceHolder);
 
-		if (definition.isReadOnly()) {
+		if (logger.isDebugEnabled()) {
+			logger
+					.debug(String.format("About to start transaction for session %s.", debugString(resourceHolder.getSession())));
+		}
 
-			if (logger.isDebugEnabled()) {
-				logger.debug(String.format(
-						"Detected readOnly transaction - enable causal consistency via session %s but do start read/write transaction.o",
-						debugString(resourceHolder.getSession())));
-			}
-		} else {
+		try {
+			mongoTransactionObject.startTransaction(options);
+		} catch (MongoException ex) {
+			throw new TransactionSystemException(String.format("Could not start Mongo transaction for session %s.",
+					debugString(mongoTransactionObject.getSession())), ex);
+		}
 
-			if (logger.isDebugEnabled()) {
-				logger.debug(
-						String.format("About to start transaction for session %s.", debugString(resourceHolder.getSession())));
-			}
-
-			try {
-				mongoTransactionObject.startTransaction(options);
-			} catch (MongoException ex) {
-				throw new TransactionSystemException(String.format("Could not start Mongo transaction for session %s.",
-						debugString(mongoTransactionObject.getSession())), ex);
-			}
-
-			if (logger.isDebugEnabled()) {
-				logger.debug(String.format("Started transaction for session %s.", debugString(resourceHolder.getSession())));
-			}
+		if (logger.isDebugEnabled()) {
+			logger.debug(String.format("Started transaction for session %s.", debugString(resourceHolder.getSession())));
 		}
 
 		resourceHolder.setSynchronizedWithTransaction(true);
@@ -187,10 +177,6 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	@Override
 	protected void doCommit(DefaultTransactionStatus status) throws TransactionException {
 
-		if (status.isReadOnly()) {
-			return; // readonly only uses the session - no need to commit that
-		}
-
 		MongoTransactionObject mongoTransactionObject = extractMongoTransaction(status);
 
 		if (logger.isDebugEnabled()) {
@@ -213,10 +199,6 @@ public class MongoTransactionManager extends AbstractPlatformTransactionManager
 	 */
 	@Override
 	protected void doRollback(DefaultTransactionStatus status) throws TransactionException {
-
-		if (status.isReadOnly()) {
-			return; // readonly only uses the session - no need to rollback that
-		}
 
 		MongoTransactionObject mongoTransactionObject = extractMongoTransaction(status);
 
